@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' data:; font-src 'self' data:; img-src 'self' data:; media-src 'self' blob: https://cdn.islamic.network https://*.islamic.network; connect-src 'self' blob: https://cdn.islamic.network https://*.islamic.network https://api.aladhan.com https://*.aladhan.com https://ipwho.is https://*.ipwho.is;">
+  <title>Sakinah · سَكِينَة</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="assets/fonts/jakarta/400.css">
+  <link rel="stylesheet" href="assets/fonts/jakarta/500.css">
+  <link rel="stylesheet" href="assets/fonts/jakarta/600.css">
+  <link rel="stylesheet" href="assets/fonts/jakarta/700.css">
+  <link rel="stylesheet" href="assets/fonts/amiri/400.css">
+  <link rel="stylesheet" href="assets/fonts/amiri/700.css">
+</head>
+<body>
+
+  <!-- icon sprite -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M19.1 4.9l-1.7 1.7M6.6 17.4l-1.7 1.7"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h9M17 17h3"/><circle cx="14.5" cy="7" r="1.8"/><circle cx="8.5" cy="12" r="1.8"/><circle cx="14.5" cy="17" r="1.8"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8.5 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7.5"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-max" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+      <symbol id="i-restore" viewBox="0 0 24 24"><rect x="5" y="8" width="11" height="11" rx="1.5"/><path d="M9 5h10v10"/></symbol>
+      <symbol id="i-left" viewBox="0 0 24 24"><path d="M14.5 5.5 8 12l6.5 6.5"/></symbol>
+      <symbol id="i-right" viewBox="0 0 24 24"><path d="M9.5 5.5 16 12l-6.5 6.5"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15.5 15.5 4.5 4.5"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 3.5V8h-4.5"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-10.3A6.5 6.5 0 0 1 12 4a6.5 6.5 0 0 1 6.5 6.7C18.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.2"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9.5a6 6 0 1 0-12 0c0 5.5-2.2 6.8-2.2 6.8h16.4S18 15 18 9.5"/><path d="M10.3 19.7a2 2 0 0 0 3.4 0"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10.2 4.9 7.6 4.5 4.5 4.7v13.6c3.1-.2 5.7.2 7.5 1.8 1.8-1.6 4.4-2 7.5-1.8V4.7c-3.1-.2-5.7.2-7.5 1.8Z"/><path d="M12 6.5v13.6"/></symbol>
+      <symbol id="i-maximize-cyl" viewBox="0 0 24 24"><path d="M15 9V5h4v4M9 15v4H5v-4"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- frameless window: drag strip + window controls -->
+  <header class="titlebar" id="titlebar">
+    <div class="brand">
+      <span class="brand-ar" lang="ar" dir="rtl">سَكِينَة</span>
+      <span class="brand-en">Sakinah</span>
+    </div>
+    <div class="win-controls">
+      <button class="wbtn" id="win-min" title="Minimize"><svg><use href="#i-min"/></svg></button>
+      <button class="wbtn" id="win-max" title="Maximize">
+        <svg class="glyph-max"><use href="#i-max"/></svg>
+        <svg class="glyph-restore"><use href="#i-restore"/></svg>
+      </button>
+      <button class="wbtn close" id="win-close" title="Close"><svg><use href="#i-x"/></svg></button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <div class="tab-group">
+      <button class="tab active" data-view="today">
+        <svg><use href="#i-bell"/></svg><span>Today</span><span class="tab-ar" lang="ar">اليوم</span>
+      </button>
+      <button class="tab" data-view="quran">
+        <svg><use href="#i-book"/></svg><span>Quran</span><span class="tab-ar" lang="ar">القرآن</span>
+      </button>
+    </div>
+    <div class="nav-right">
+      <button id="theme-btn" class="icon-btn" title="Toggle light / dark">
+        <svg class="glyph-moon"><use href="#i-moon"/></svg>
+        <svg class="glyph-sun"><use href="#i-sun"/></svg>
+      </button>
+      <button id="settings-btn" class="icon-btn" title="Settings">
+        <svg><use href="#i-gear"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <main>
+    <!-- ============ TODAY ============ -->
+    <section id="view-today" class="view active">
+      <div class="hero-grid">
+        <div class="card greeting-card">
+          <div class="salam ar" lang="ar">ٱلسَّلَامُ عَلَيْكُمْ</div>
+          <h1 id="greeting">Peace be upon you</h1>
+          <div class="dates" id="date-line">…</div>
+          <div class="dates hijri" id="hijri-line"></div>
+          <div class="loc-line" id="loc-line"></div>
+        </div>
+
+        <div class="card countdown-card" id="countdown-card">
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="0 0 200 200">
+              <circle class="ring-track" cx="100" cy="100" r="86"></circle>
+              <circle class="ring-prog" id="ring-prog" cx="100" cy="100" r="86"></circle>
+            </svg>
+            <div class="ring-center">
+              <div class="next-kicker" id="next-kicker">Next prayer</div>
+              <div class="next-ar ar" id="next-name-ar">…</div>
+              <div class="next-en" id="next-name-en">…</div>
+              <div class="countdown" id="countdown">—</div>
+              <div class="countdown-at" id="countdown-at"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prayer-row" id="prayer-row">
+        <div class="card loading-card">Fetching today's prayer times…</div>
+      </div>
+
+      <div class="stack-grid">
+        <div class="card streak-card" id="streak-card">
+          <div class="streak-main">…</div>
+          <div class="streak-sub" id="streak-sub"></div>
+        </div>
+        <div class="card week-card" id="week-card"></div>
+      </div>
+
+      <div class="card ayah-card" id="ayah-card">
+        <div class="ayah-label">Ayah of the day</div>
+        <div class="ayah-body" id="ayah-body">…</div>
+      </div>
+
+      <div class="src-note">Prayer times by <b>Aladhan API</b> · Quran text by <b>AlQuran Cloud</b> · everything else lives on your machine</div>
+    </section>
+
+    <!-- ============ QURAN ============ -->
+    <section id="view-quran" class="view">
+      <aside class="surah-pane">
+        <div class="search-wrap">
+          <svg><use href="#i-search"/></svg>
+          <input id="surah-search" type="text" placeholder="Search 114 surahs…" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="surah-list" id="surah-list"></div>
+      </aside>
+      <div class="reader-pane" id="reader-pane">
+        <button id="reader-back" class="reader-back" title="Back to surah list">‹&nbsp; All surahs</button>
+        <div id="reader-content"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ SETTINGS ============ -->
+  <div id="settings-backdrop" class="modal-backdrop hidden">
+    <div class="modal card">
+      <div class="modal-head">
+        <h2>Settings</h2>
+        <button id="settings-close" class="icon-btn" title="Close"><svg><use href="#i-x"/></svg></button>
+      </div>
+
+      <div class="settings-body">
+        <div class="set-group">
+          <div class="set-title">Location</div>
+          <div class="set-line" id="set-loc-current">Detecting…</div>
+          <div class="set-controls">
+            <label class="radio"><input type="radio" name="locmode" value="auto"> Auto-detect</label>
+            <label class="radio"><input type="radio" name="locmode" value="manual"> Enter city manually</label>
+          </div>
+          <div class="manual-row hidden" id="manual-row">
+            <input id="set-city" type="text" placeholder="City (e.g. Riyadh)" spellcheck="false">
+            <input id="set-country" type="text" placeholder="Country (e.g. Saudi Arabia)" spellcheck="false">
+          </div>
+          <div class="set-buttons">
+            <button class="btn" id="btn-redetect"><svg class="btn-svg"><use href="#i-refresh"/></svg> Re-detect location</button>
+            <button class="btn" id="btn-test-notif"><svg class="btn-svg"><use href="#i-bell"/></svg> Test notification</button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-title">Prayer calculation</div>
+          <div class="select-row">
+            <label>Method
+              <select id="set-method"></select>
+            </label>
+            <label>ʿAsr school
+              <select id="set-school">
+                <option value="0">Standard (Shafiʿi, Maliki, Hanbali)</option>
+                <option value="1">Hanafi</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-title">Reminders</div>
+          <div class="select-row">
+            <label>Notify me
+              <select id="set-offset">
+                <option value="0">At prayer time</option>
+                <option value="5">5 minutes before</option>
+                <option value="10">10 minutes before</option>
+                <option value="15">15 minutes before</option>
+                <option value="20">20 minutes before</option>
+                <option value="30">30 minutes before</option>
+              </select>
+            </label>
+            <label>Clock
+              <select id="set-timeformat">
+                <option value="12h">12-hour</option>
+                <option value="24h">24-hour</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-title">Recitation</div>
+          <label class="select-single">Reciter
+            <select id="set-reciter"></select>
+          </label>
+        </div>
+
+        <div class="set-group">
+          <div class="set-title">Appearance</div>
+          <div class="set-controls">
+            <label class="radio"><input type="radio" name="theme" value="auto"> Follow Windows</label>
+            <label class="radio"><input type="radio" name="theme" value="light"> Light</label>
+            <label class="radio"><input type="radio" name="theme" value="dark"> Dark</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-primary" id="btn-save-settings">Save settings</button>
+        <div class="foot-note">Everything is stored locally on this computer.</div>
+      </div>
+    </div>
+  </div>
+
+<script src="js/storage.js"></script>
+<script src="js/android-bridge.js"></script>
+<script src="data/quran-ar.js"></script>
+<script src="data/quran-en.js"></script>
+<script src="js/quran.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

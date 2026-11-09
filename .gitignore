@@ -1,0 +1,27 @@
+# ── dependencies ──
+node_modules/
+mobile/node_modules/
+
+# ── build outputs (published as GitHub Releases instead) ──
+dist/
+mobile/www/
+mobile/android/app/src/main/assets/public/
+site/download/*.exe
+site/download/*.apk
+
+# ── android gradle caches/build + machine paths ──
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/capacitor-cordova-android-plugins/build/
+mobile/android/app/src/main/assets/capacitor.config.json.bak
+mobile/android/local.properties
+
+# ── local tooling / scratch (never part of the repo) ──
+android-tools/
+gh-tools/
+
+# ── OS noise ──
+Thumbs.db
+.DS_Store
+*.log

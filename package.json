@@ -1,0 +1,50 @@
+{
+  "name": "sakinah",
+  "productName": "Sakinah",
+  "version": "1.1.0",
+  "description": "A calm Quran & salah companion for Windows. Read, remember, and stay consistent with your daily prayers.",
+  "main": "main.js",
+  "author": "Sakinah",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.sakinah.app",
+    "productName": "Sakinah",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sakinah"
+    }
+  },
+  "devDependencies": {
+    "@fontsource/amiri": "^5.3.0",
+    "@fontsource/plus-jakarta-sans": "^5.3.0",
+    "electron": "^37.0.0",
+    "electron-builder": "^26.18.0",
+    "png-to-ico": "^3.0.2"
+  }
+}
