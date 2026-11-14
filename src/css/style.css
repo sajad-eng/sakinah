@@ -202,6 +202,10 @@ svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.9; fill: 
 body.is-maximized .wbtn .glyph-max { display: none; }
 body.is-maximized .wbtn .glyph-restore { display: block; }
 
+/* Android shell: the – □ ✕ window buttons are Windows-only decorations;
+   phones already have system navigation, so don't render them in the APK. */
+.android-shell .win-controls { display: none; }
+
 /* ---------------- tabs ---------------- */
 
 .tabs {
@@ -866,6 +870,10 @@ main {
   transition: opacity .2s ease;
 }
 .ayah:hover .ayah-acts, .ayah.playing .ayah-acts { opacity: 1; }
+/* touch devices have no hover — keep the per-ayah play/copy buttons visible */
+@media (hover: none), (pointer: coarse) {
+  .ayah-acts { opacity: 1; }
+}
 .ayah-acts .a-btn {
   width: 28px; height: 28px;
   display: grid; place-items: center;
@@ -1108,3 +1116,148 @@ main {
 @media (max-width: 720px) {
   #view-quran.reader-mode .reader-back { display: inline-block; }
 }
+
+/* ---------------- offline recitation (audio cache) ---------------- */
+
+.surah-item { position: relative; }
+.surah-dl {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  font-size: 13px;
+  line-height: 1;
+}
+:root[data-theme="dark"] .surah-dl { color: var(--accent); }
+.surah-dl svg { width: 12px; height: 12px; stroke-width: 2.2; }
+.surah-dl.partial { color: var(--gold); background: transparent; font-size: 16px; }
+
+/* reader toolbar download button states */
+.rs-btn.dl-done { color: var(--accent-deep); border-color: var(--accent-ring); background: var(--accent-soft); }
+:root[data-theme="dark"] .rs-btn.dl-done { color: var(--accent); }
+.rs-btn.dl-busy {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  animation: dl-pulse 1.4s ease-in-out infinite;
+}
+@keyframes dl-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+/* settings: offline recitation card rows */
+.off-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.off-note { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.off-rec {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 11px 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+.off-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.off-name { font-weight: 700; font-size: 13.5px; color: var(--ink-strong); }
+.off-info { font-size: 11.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.off-btns { display: flex; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+.off-btns .btn { padding: 7px 12px; font-size: 12.5px; }
+.off-btns .btn:disabled { opacity: .45; cursor: default; transform: none; }
+.off-status { margin-top: 8px; font-size: 12px; color: var(--accent-deep); min-height: 15px; }
+:root[data-theme="dark"] .off-status { color: var(--accent); }
+.set-note { font-size: 12px; color: var(--faint); line-height: 1.55; margin-top: 2px; }
+
+/* progress bars (downloads) */
+.off-bar {
+  height: 7px;
+  border-radius: 6px;
+  background: var(--line);
+  overflow: hidden;
+  margin: 4px 0 6px;
+}
+.off-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  transition: width .4s ease;
+}
+:root[data-theme="dark"] .off-bar i { background: linear-gradient(90deg, var(--accent), var(--accent-deep)); }
+.off-status-line { font-size: 12px; color: var(--muted); }
+:root[data-theme="dark"] .off-status-line { color: var(--ink); }
+.surah-dl.clickable { cursor: pointer; transition: transform .15s ease, background .2s ease; }
+.surah-dl.clickable:hover { transform: scale(1.14); color: var(--accent); }
+.surah-dl.busy {
+  color: var(--gold-bright);
+  background: transparent;
+  font-weight: 700;
+  font-size: 10.5px;
+  animation: dl-pulse 1.6s ease-in-out infinite;
+  cursor: default;
+}
+
+/* whole-Quran quick action (sits under the search box in the surah pane) */
+.whole-row { display: flex; flex-direction: column; gap: 5px; }
+.whole-btn { justify-content: center; font-size: 13px; padding: 10px 14px; }
+.whole-btn svg { width: 15px; height: 15px; }
+.whole-btn.busy {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  animation: dl-pulse 1.6s ease-in-out infinite;
+}
+.whole-status { font-size: 11.5px; color: var(--faint); text-align: center; min-height: 15px; }
+:root[data-theme="dark"] .whole-status { color: var(--muted); }
+
+/* "Download the surah" row — top of the open surah, above the ayahs */
+.s-dl-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+.s-dl-row[hidden] { display: none; }
+.s-dl-btn { font-size: 13px; white-space: nowrap; padding: 9px 16px; }
+.s-dl-btn.dl-done { color: var(--gold); border-color: var(--gold); opacity: .85; }
+.s-dl-btn.dl-busy {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  animation: dl-pulse 1.6s ease-in-out infinite;
+}
+.s-dl-side { flex: 1; min-width: 0; }
+.s-dl-bar {
+  height: 7px;
+  border-radius: 6px;
+  background: var(--line);
+  overflow: hidden;
+  display: none;
+}
+.s-dl-row.busy .s-dl-bar { display: block; }
+.s-dl-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  transition: width .4s ease;
+}
+:root[data-theme="dark"] .s-dl-bar i { background: linear-gradient(90deg, var(--accent), var(--accent-deep)); }
+.s-dl-line { font-size: 12px; color: var(--muted); min-height: 15px; margin-top: 3px; }
+:root[data-theme="dark"] .s-dl-line { color: var(--ink); }
+

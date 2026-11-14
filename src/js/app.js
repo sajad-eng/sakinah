@@ -762,7 +762,7 @@
     (window.Quran && Quran.RECITERS || []).forEach((r) => {
       const o = document.createElement('option');
       o.value = r.id;
-      o.textContent = r.name;
+      o.textContent = r.name + (window.AudioOffline && AudioOffline.isBundled && AudioOffline.isBundled(r.id) ? ' — built-in ✓' : '');
       if (r.id === wantedReciter) o.selected = true;
       recSel.appendChild(o);
     });
@@ -774,6 +774,14 @@
     el('set-offset').value = String(S.offsetMin);
     el('set-timeformat').value = S.timeFormat;
     document.querySelector(`input[name="theme"][value="${S.theme}"]`).checked = true;
+
+    // offline recitation manager (renders per-reciter rows inside the card)
+    const codecSel = el('set-audio-codec');
+    if (codecSel) codecSel.value = (window.AudioOffline ? AudioOffline.codec() : 'opus32');
+    const offList = el('offline-audio-list');
+    if (offList && window.AudioOffline) {
+      try { AudioOffline.mountSettings(offList); } catch (e) { log('offline settings render failed', e); }
+    }
 
     document.querySelectorAll('input[name="locmode"]').forEach((r) => {
       r.addEventListener('change', () => {
@@ -854,6 +862,13 @@
       if (recSel.value && store) store.set('reciter', recSel.value);
       if (window.Quran && Quran.setReciter) Quran.setReciter(recSel.value);
 
+      // offline audio quality
+      const codecSel = el('set-audio-codec');
+      if (codecSel && window.AudioOffline) {
+        AudioOffline.setCodec(codecSel.value);
+        store.set('audioCodec', codecSel.value);
+      }
+
       closeSettings();
       refreshTimings();
       resyncSchedule();
@@ -873,6 +888,12 @@
     applyTheme();
     initShell();
     initSettings();
+
+    // offline recitation cache (IndexedDB) — start early so the reader
+    // already knows which ayahs are on the device
+    if (window.AudioOffline) {
+      try { AudioOffline.boot(); } catch (e) { log('audio offline boot failed', e); }
+    }
 
     // cached timings for instant first paint
     const cached = store && store.get('timings', null);
@@ -925,6 +946,18 @@
       const ps = params.get('sura');
       const ppg = params.get('page');
       if (ps) setTimeout(() => Quran.open(Number(ps), ppg ? Number(ppg) : undefined), 450);
+      const dls = params.get('dls');
+      if (dls) setTimeout(() => {
+        try {
+          Quran.offline.downloadSurah(Number(dls));
+          log('dls enqueue surah ' + dls);
+          const t = setInterval(() => {
+            const q = window.AudioOffline ? AudioOffline.queueState() : null;
+            log('dls state ' + JSON.stringify(q));
+            if (q && !q.running) clearInterval(t);
+          }, 1300);
+        } catch (e) { log('dls error', e); }
+      }, 700);
       const pon = params.get('once');
       if (pon) setTimeout(() => {
         const g = Number(pon);

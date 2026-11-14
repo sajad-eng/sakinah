@@ -6,6 +6,12 @@
   'use strict';
   if (window.sakinah) return; // desktop bridge already present
 
+  // Running in the Android/Capacitor build (no Electron preload bridge).
+  // Mark the document so phone-only CSS applies — e.g. hide the desktop
+  // window controls (minimize / maximize / close): phones have their own
+  // system navigation, so those buttons are dead Windows decorations.
+  document.documentElement.classList.add('android-shell');
+
   function safeFetchJson(url) {
     return fetch(url).then(function (r) { return r.json(); });
   }

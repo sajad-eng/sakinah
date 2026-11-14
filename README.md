@@ -25,6 +25,14 @@ streak, and listen to six famous reciters — all in a peaceful, ad-free app.
 - 🎧 **Six reciters** — Al-Afasy, Abdul Basit, As-Sudais, Ash-Shatri, Al-Husary,
   Al-Minshawi. Ayah-by-ayah playback with **preloaded streaming** so recitation
   flows seamlessly (Ayah-of-the-day intentionally plays just the one ayah).
+- ⤓ **Offline recitation** — the voices work without internet too, not just the
+  text. Anything you listen to is saved automatically; every surah row in the
+  list has its own ⤓ download button, there's a big **Whole Quran** button under
+  the search, and **Settings → Offline recitation** manages per-reciter storage
+  with a live progress bar and estimated time. Files are stored in compact
+  **Opus 32 kbps** (≈ 450 MB per reciter instead of ≈ 906 MB of MP3 — Opus
+  24 kbps ≈ 340 MB, or keep MP3 if you prefer) and downloads **resume
+  automatically** after a restart. Same experience on the Android build.
 - ⏰ **Gentle prayer reminders** — notifications from the Windows tray, even
   while the window is closed to the tray. Auto location detect (or manual) and
   all Aladhan calculation methods.
@@ -89,8 +97,9 @@ cd android
 No accounts, no keys, no analytics, no data collection. Salah check-offs and
 settings live in local storage on your device. The only network calls are:
 prayer times (api.aladhan.com), IP→city lookup (ipwho.is), and recitation audio
-(cdn.islamic.network). Quran text, fonts and translations are bundled and work
-fully offline.
+(cdn.islamic.network). Downloaded recitations are stored on your device only and
+never leave it — delete them anytime in Settings. Quran text, fonts and
+translations are bundled and work fully offline.
 
 ## 🙏 Credits & data sources
 

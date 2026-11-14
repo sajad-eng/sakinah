@@ -1,1 +1,10 @@
-{"appId":"com.sakinah.mobile","appName":"Sakinah","webDir":"www"}
+{
+  "appId": "com.sakinah.mobile",
+  "appName": "Sakinah",
+  "webDir": "www",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

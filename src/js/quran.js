@@ -70,50 +70,24 @@
   const audio = new Audio();
   audio.preload = 'auto';
 
-  // seamless recitation: fetch ayah MP3s as blobs ahead of the playhead,
-  // so switching ayahs swaps instantly instead of waiting for a CDN fetch
-  const blobCache = new Map();      // "reciter:globalNum" -> object URL
-  const prefetching = new Set();
-  function cacheKey(globalNum) { return reciter + ':' + globalNum; }
-  async function prefetchAyah(globalNum) {
-    const k = cacheKey(globalNum);
-    if (blobCache.has(k) || prefetching.has(k)) return;
-    prefetching.add(k);
-    try {
-      const r = await fetch(cdlUrls(globalNum)[0]);
-      if (!r.ok) throw new Error(String(r.status));
-      const blob = await r.blob();
-      blobCache.set(k, URL.createObjectURL(blob));
-      dbg('prefetch OK num=' + globalNum + ' bytes=' + blob.size + ' cache=' + blobCache.size);
-      if (blobCache.size > 40) {
-        for (const old of Array.from(blobCache.keys())) {
-          URL.revokeObjectURL(blobCache.get(old));
-          blobCache.delete(old);
-          if (blobCache.size <= 30) break;
-        }
-      }
-    } catch (e) {
-      dbg('prefetch FAIL num=' + globalNum + ' err=' + String((e && e.message) || e));
-      // leave uncached — the direct-URL streaming path still works
-    }
-    prefetching.delete(k);
-  }
-  function prefetchAhead(surahObj, ayahIdx) {
-    for (let j = ayahIdx + 1; j <= ayahIdx + 2 && j < surahObj.ayahs.length; j++) {
-      prefetchAyah(surahObj.ayahs[j].number);
-    }
-  }
-
-  function cdlUrls(globalNum) {
-    return [AUDIO_BASE + reciter + '/' + globalNum + '.mp3', CDN_FALLBACK + reciter + '/' + globalNum + '.mp3'];
-  }
-
+  // Offline-first pipeline (audio-offline.js): resolve the ayah from the
+  // persistent IndexedDB cache when possible; when not cached, fetch from the
+  // CDN (per-reciter bitrate: Abdul Basit & As-Sudais are 64-only, Al-Minshawi
+  // is 128-only — handled internally) and store it for later offline use.
+  let playOfflineMsg = false;     // floating bar shows an offline notice
   let tryIdx = 0;
   function dbg(m) {
     try { console.log('[sakinah][dbg] ' + m); } catch (e) {}
   }
-  function playAyah(surahObj, ayahIdx, once) {
-    if (true) { const _ck = cacheKey(surahObj.ayahs[ayahIdx].number); dbg('play su=' + surahObj.number + ' idx=' + ayahIdx + ' cached=' + (blobCache.has(_ck) ? 'HIT' : 'MISS') + ' fetching=' + prefetching.has(_ck)); }
+
+  function prefetchAhead(surahObj, ayahIdx) {
+    if (!window.AudioOffline) return;
+    for (let j = ayahIdx + 1; j <= ayahIdx + 2 && j < surahObj.ayahs.length; j++) {
+      AudioOffline.prefetch(reciter, surahObj.ayahs[j].number);
+    }
+  }
+
+  async function playAyah(surahObj, ayahIdx, once) {
     try {
       const a = surahObj.ayahs[ayahIdx];
       if (!a) return stop();
@@ -121,20 +95,59 @@
       playOnce = !!once;
       curPlayIdx = ayahIdx;
       playGlobal = a.number;
-      const cached = blobCache.get(cacheKey(a.number));
-      audio.src = cached || cdlUrls(a.number)[0];
+      playOfflineMsg = false;
       tryIdx = 0;
-      prefetchAhead(surahObj, ayahIdx);
+      notifyChange();
+
+      // Android: hand playback to the native foreground service (screen-off
+      // survival + lock-screen / Bluetooth controls). Throws E_OFFLINE the
+      // same way as the web path when the ayah is neither cached nor bundled
+      // and there is no network — the shared catch below handles it.
+      if (window.AudioNative && AudioNative.available()) {
+        dbg('route=native → AudioNative.start num=' + a.number);
+        await AudioNative.start({
+          reciter,
+          reciterName: reciterName(),
+          surahObj,
+          idx: ayahIdx,
+          once: !!once,
+        });
+        return;
+      }
+
+      let src = null;
+      if (window.AudioOffline) {
+        try { await AudioOffline.boot(); } catch (e) {}
+        const res = await AudioOffline.ensure(reciter, a.number, {});
+        // the reader may have moved on while we were resolving — don't disturb it
+        if (playCtx !== surahObj || curPlayIdx !== ayahIdx) return;
+        src = res && res.url;
+        dbg('resolved num=' + a.number + ' ' + (!res || res.fetched ? 'CDN→now-cached' : 'CACHE HIT') + ' mime=' + (res && res.mime));
+        if (src) prefetchAhead(surahObj, ayahIdx);
+      }
+      if (!src) src = AUDIO_BASE + reciter + '/' + a.number + '.mp3'; // last resort (module absent)
+      audio.src = src;
       const p = audio.play();
       if (p && p.catch) p.catch(() => {});
       notifyChange();
     } catch (err) {
+      if (err && err.code === 'E_OFFLINE') {
+        // no cache, no network → keep the bar visible with a calm notice
+        dbg('offline & not cached: ' + reciter + String((playCtx && playCtx.ayahs[curPlayIdx] || {}).number));
+        playOfflineMsg = true;
+        curPlayIdx = -1;
+        playGlobal = -1;
+        notifyChange();
+        return;
+      }
       console.error('[sakinah] audio error', err);
+      stop();
     }
   }
 
   audio.addEventListener('ended', () => {
     if (playOnce) { stop(); return; }               // Ayah of the Day: just this ayah
+    if (playOfflineMsg) { stop(); return; }
     if (autoContinue && playCtx && curPlayIdx + 1 < playCtx.ayahs.length) {
       prefetchAhead(playCtx, curPlayIdx + 1);
       playAyah(playCtx, curPlayIdx + 1);            // next ayah is (pre)loaded → no gap
@@ -143,26 +156,107 @@
     }
   });
 
-  audio.addEventListener('error', () => {
-    // resilient: fall back to the 64kbps mirror once
+  audio.addEventListener('error', async () => {
+    // resilient: ask the resolver once more (e.g. other bitrate / re-fetch)
     const a = playCtx && playCtx.ayahs[curPlayIdx];
-    if (a && tryIdx === 0) {
+    if (a && tryIdx === 0 && window.AudioOffline) {
       tryIdx = 1;
-      audio.src = cdlUrls(a.number)[1];
-      const p = audio.play();
-      if (p && p.catch) p.catch(() => stop());
-    } else {
-      stop();
+      try {
+        const res = await AudioOffline.ensure(reciter, a.number, { persist: false });
+        if (playCtx && playCtx.ayahs[curPlayIdx] === a && res && res.url) {
+          audio.src = res.url;
+          const p = audio.play();
+          if (p && p.catch) p.catch(() => stop());
+          return;
+        }
+      } catch (e) {}
     }
+    stop();
   });
 
   function stop() {
+    if (window.AudioNative && AudioNative.available() && AudioNative.isActive()) {
+      AudioNative.stop();          // native session → service stops → 'stopped' event → internalStop()
+      return;
+    }
+    internalStop();
+  }
+
+  function internalStop() {
+    playOfflineMsg = false;
     try { audio.pause(); } catch {}
     try { audio.removeAttribute('src'); audio.load(); } catch {}
     curPlayIdx = -1;
     playGlobal = -1;
     playCtx = null;
     notifyChange();
+  }
+
+  // ---- native (Android) state mirroring + dry-wake ----
+  function nativeDry() {
+    if (!window.AudioNative || !AudioNative.available()) return;
+    // prefer the native queue's live position — our mirror may have missed
+    // "playing" events while the WebView was suspended in the background
+    const i = AudioNative.isActive() ? AudioNative.currentIndex() : curPlayIdx;
+    const s = playCtx;
+    if (!s || i < 0) { AudioNative.stop(); return; }
+    if (i + 1 < s.ayahs.length) {
+      AudioNative.ensureNext().catch(() => {}); // fetch + append; the service continues itself
+    } else {
+      AudioNative.stop(); // surah finished — release the service + notification
+    }
+  }
+  if (window.AudioNative && AudioNative.available()) {
+    AudioNative.setHandlers({
+      state(st, num, idx) {
+        if (st === 'playing') {
+          if (playCtx && idx >= 0 && idx < playCtx.ayahs.length) {
+            curPlayIdx = idx;
+            playGlobal = playCtx.ayahs[idx].number;
+          }
+          playOfflineMsg = false;
+          notifyChange();
+        } else if (st === 'paused') {
+          notifyChange();
+        } else {
+          internalStop();
+        }
+      },
+      dry: nativeDry,
+    });
+  }
+
+  // A native session can outlive this WebView: Android may destroy the
+  // activity while the app is backgrounded and the service keeps reciting.
+  // On the next launch, rebuild the player state (floating bar, highlight,
+  // stop button) from the service's live queue so sound is controllable again.
+  async function adoptNativeSession() {
+    if (!(window.AudioNative && AudioNative.available())) return;
+    try {
+      const q = await AudioNative.sync();
+      if (!q || !q.count || !q.num) return;
+      const num = Number(q.num);
+      for (const s of AR) {
+        const i = s.ayahs.findIndex((a) => a.number === num);
+        if (i < 0) continue;
+        playCtx = s;
+        playOnce = false;
+        playOfflineMsg = false;
+        curPlayIdx = i;
+        playGlobal = num;
+        AudioNative.adopt({
+          surahObj: s,
+          idx: i,
+          pos: q.pos,
+          count: q.count,
+          playing: q.playing,
+          reciter: q.reciter || reciter,
+          reciterName: reciterName(q.reciter || reciter),
+        });
+        notifyChange();
+        return;
+      }
+    } catch (e) {}
   }
 
   function notifyChange() {
@@ -197,6 +291,12 @@
 
   function updateBar() {
     if (!barEls) return;
+    if (playCtx && playOfflineMsg) {
+      barEls.root.classList.remove('hidden');
+      barEls.ar.textContent = '⤓ Offline';
+      barEls.count.textContent = ' — “' + (playCtx.englishName || playCtx.name) + '” isn’t downloaded yet. Connect once and tap ⤓ in the reader.';
+      return;
+    }
     if (playCtx && curPlayIdx >= 0) {
       barEls.root.classList.remove('hidden');
       barEls.ar.textContent = playCtx.name;
@@ -206,6 +306,128 @@
     }
   }
 
+  // ---------- offline download affordances (toolbar ⤓ + list badges) ----------
+  const dlRefs = { btn: null, lbl: null, fill: null, line: null, surah: null };
+  let wholeRefs = null;               // { btn, label, st } — Whole-Quran quick action
+  let dlDebounce = null;
+
+  function surahDlState(s) {
+    if (!window.AudioOffline || !AudioOffline.isIndexed()) return null;
+    try {
+      const cnt = AudioOffline.surahCounts(reciter, s.ayahs.map((a) => a.number));
+      const q = AudioOffline.queueState();
+      const busy = q.running && q.rec === reciter
+        && String(q.title).indexOf('Surah ' + s.number + ' ') === 0;
+      return { cnt, q, busy };
+    } catch (e) { return null; }
+  }
+
+  function etaSuffix(q) {
+    if (!window.AudioOffline || q.etaSec == null) return '';
+    return ' · ' + AudioOffline.fmtEta(q.etaSec);
+  }
+
+  function paintDl() {
+    const b = dlRefs.btn, s = dlRefs.surah;
+    if (!b || !s) return;
+    const row = b.parentNode; // .s-dl-row
+    if (!window.AudioOffline) { row.hidden = true; return; }
+    row.hidden = false;
+    const lbl = dlRefs.lbl, fill = dlRefs.fill, line = dlRefs.line;
+    row.classList.remove('busy');
+    fill.style.width = '0';
+    line.textContent = '';
+    b.classList.remove('dl-busy', 'dl-done');
+    const st = surahDlState(s);
+    if (!st) {
+      lbl.textContent = 'Download the surah';
+      b.title = 'Download this surah so it keeps playing with no internet';
+      paintWhole();
+      return;
+    }
+    if (st.cnt.total > 0 && st.cnt.have >= st.cnt.total) {
+      b.classList.add('dl-done');
+      lbl.textContent = 'Offline ✓';
+      fill.style.width = '100%';
+      b.title = 'This surah is downloaded — it plays with no internet';
+      line.textContent = 'downloaded · plays with no internet';
+    } else if (st.busy) {
+      row.classList.add('busy');
+      b.classList.add('dl-busy');
+      lbl.textContent = st.q.paused ? 'Resume' : 'Pause';
+      const pct = st.cnt.total ? Math.round((100 * st.cnt.have) / st.cnt.total) : 0;
+      fill.style.width = Math.max(4, Math.min(100, pct)) + '%';
+      let txt = (st.q.paused ? 'paused ' : '⤓ downloading ') + st.cnt.have + '/' + st.cnt.total + ' ayahs · ' + pct + '%';
+      if (st.q.rate) txt += ' · ' + AudioOffline.fmtRate(st.q.rate);
+      if (st.q.etaSec != null) txt += ' · ' + AudioOffline.fmtEta(st.q.etaSec);
+      if (st.q.failed) txt += ' · ' + st.q.failed + ' failed';
+      line.textContent = txt;
+      b.title = st.q.paused ? 'Resume the download' : 'Pause the download';
+    } else {
+      lbl.textContent = 'Download the surah';
+      if (st.cnt.have > 0) {
+        fill.style.width = Math.max(2, Math.round((100 * st.cnt.have) / Math.max(1, st.cnt.total))) + '%';
+        line.textContent = st.cnt.have + '/' + st.cnt.total + ' ayahs already cached — tap to download the rest';
+      }
+      b.title = 'Download this surah so it keeps playing with no internet';
+    }
+    paintWhole();
+  }
+
+  function paintWhole() {
+    if (!wholeRefs || !window.AudioOffline) return;
+    const q = AudioOffline.queueState();
+    const b = wholeRefs.btn, label = wholeRefs.label, stEl = wholeRefs.st;
+    const mine = q.running && q.rec === reciter && String(q.title).indexOf('Whole Quran') === 0;
+    b.classList.toggle('busy', mine);
+    stEl.textContent = '';
+    if (mine) {
+      const pct = q.total ? Math.round((100 * q.done) / q.total) : 0;
+      b.disabled = false;
+      label.textContent = '⤓ Whole Quran · ' + pct + '%';
+      let txt = q.paused ? 'paused ' : 'downloading ';
+      txt += q.done + '/' + q.total + ' ayahs';
+      if (!q.paused && q.rate) txt += ' · ' + AudioOffline.fmtRate(q.rate) + etaSuffix(q);
+      if (q.paused) txt += ' — tap again to resume';
+      if (q.failed) txt += ' · ' + q.failed + ' failed';
+      stEl.textContent = txt;
+      b.title = q.paused ? 'Resume the whole-Quran download' : 'Pause the whole-Quran download';
+    } else if (q.running) {
+      b.disabled = false;
+      label.textContent = 'Whole Quran';
+      stEl.textContent = 'downloading ' + (q.rec !== reciter ? 'for another reciter: ' : '') + (q.title || '') + ' — ' + q.done + '/' + q.total + etaSuffix(q);
+      b.title = 'Add the whole Quran for ' + reciterName() + ' — queued behind the running job';
+    } else {
+      label.textContent = 'Whole Quran';
+      const { count, bytes } = AudioOffline.reciterBytes(reciter + '|');
+      const bun = AudioOffline.bundledAyahs ? AudioOffline.bundledAyahs(reciter) : 0;
+      const allBundled = bun > 0 && count >= bun;
+      if (count > 0) {
+        stEl.textContent = allBundled
+          ? count + ' ayahs · installed ✓ (built-in' + (count > bun ? ' + ' + (count - bun) + ' downloaded' : '') + ')'
+          : count + ' ayahs cached · ' + AudioOffline.fmtBytes(bytes) + (count < 6236 ? '' : ' — complete ✓');
+      } else {
+        stEl.textContent = '';
+      }
+      b.disabled = allBundled;
+      b.title = allBundled
+        ? 'Already installed with the app — this whole voice is built in'
+        : 'Download the full recitation (114 surahs) for offline use';
+    }
+  }
+
+  function reciterName(forId) {
+    const id = forId || reciter;
+    for (const r of RECITERS) if (r.id === id) return r.name;
+    return id;
+  }
+
+  function onQueuePaint() {
+    paintDl();
+    if (dlDebounce) clearTimeout(dlDebounce);
+    dlDebounce = setTimeout(() => { try { renderList(); } catch (e) {} }, 900);
+  }
+
   // ---------- rendering ----------
   let els = null; // { list, search, content }
   let searchQ = '';
@@ -213,6 +435,53 @@
   function init(containerEls) {
     els = containerEls;
     ensureBar();
+
+    // adopt recitation that survived an activity reload (service kept playing)
+    if (window.AudioNative && AudioNative.available()) {
+      adoptNativeSession();
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && !playCtx && AudioNative.isActive()) {
+          adoptNativeSession();
+        }
+      });
+    }
+
+    // offline recitation cache — kick off index load + subscribe for UI updates
+    if (window.AudioOffline) {
+      try { AudioOffline.boot(); } catch (e) {}
+      try { AudioOffline.onQueue(onQueuePaint); } catch (e) {}
+    }
+
+    // Whole-Quran quick action (one tap from the list; per-reciter controls live in Settings)
+    try {
+      const searchWrap = els.search && els.search.closest ? els.search.closest('.search-wrap') : null;
+      const pane = els.list && els.list.parentNode;
+      const anchor = searchWrap || pane;
+      if (anchor && !anchor._wholeBtn) {
+        anchor._wholeBtn = true;
+        const row = document.createElement('div');
+        row.className = 'whole-row';
+        const b = document.createElement('button');
+        b.className = 'btn whole-btn';
+        b.innerHTML = '<svg><use href="#i-download"/></svg><span class="wb-label">Whole Quran</span>';
+        b.addEventListener('click', () => {
+          if (!window.AudioOffline) return;
+          const q = AudioOffline.queueState();
+          if (q.running && q.rec === reciter && String(q.title).indexOf('Whole Quran') === 0) {
+            // same job is running — the button toggles pause / resume
+            if (q.paused) AudioOffline.resumeQueue(); else AudioOffline.pauseQueue();
+            return;
+          }
+          AudioOffline.enqueueWholeQuran(reciter);
+        });
+        const st = document.createElement('div');
+        st.className = 'whole-status';
+        row.appendChild(b);
+        row.appendChild(st);
+        anchor.insertAdjacentElement('afterend', row);
+        wholeRefs = { btn: b, label: b.querySelector('.wb-label'), st: st };
+      }
+    } catch (e) {}
 
     // phone: back button in the reader returns to the surah list
     const back = document.getElementById('reader-back');
@@ -291,6 +560,48 @@
 
       btn.appendChild(num);
       btn.appendChild(metaBox);
+
+      // offline affordance on the list row: ✓ fully cached · ⤓/percent when not
+      if (window.AudioOffline && AudioOffline.isIndexed && AudioOffline.isIndexed()) {
+        try {
+          const cnt = AudioOffline.surahCounts(reciter, s.ayahs.map((a) => a.number));
+          if (cnt.total > 0) {
+            const dlb = document.createElement('div');
+            if (cnt.have >= cnt.total) {
+              dlb.className = 'surah-dl';
+              dlb.title = 'Available offline ✓ (current reciter)';
+              dlb.innerHTML = '<svg><use href="#i-download"/></svg>';
+            } else {
+              const q = AudioOffline.queueState();
+              const busyThis = q.running && q.rec === reciter
+                && String(q.title).indexOf('Surah ' + s.number + ' ') === 0;
+              if (busyThis) {
+                dlb.className = 'surah-dl busy';
+                dlb.textContent = Math.round((100 * cnt.have) / cnt.total) + '%';
+                dlb.title = 'Downloading ' + cnt.have + '/' + cnt.total
+                  + (q.etaSec != null ? ' · ' + AudioOffline.fmtEta(q.etaSec) : '');
+              } else {
+                dlb.className = 'surah-dl clickable';
+                if (cnt.have > 0) {
+                  dlb.textContent = '◦';
+                  dlb.title = cnt.have + '/' + cnt.total + ' cached — tap to download the rest';
+                } else {
+                  dlb.innerHTML = '<svg><use href="#i-download"/></svg>';
+                  dlb.title = 'Download this surah for offline listening';
+                }
+                const idxNum = s.number;
+                dlb.addEventListener('click', (ev) => {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                  if (window.AudioOffline) AudioOffline.enqueueSurah(idxNum, reciter);
+                });
+              }
+            }
+            btn.appendChild(dlb);
+          }
+        } catch (e) {}
+      }
+
       btn.addEventListener('click', () => open(s.number));
       frag.appendChild(btn);
     }
@@ -408,6 +719,7 @@
     recSel.addEventListener('change', () => {
       reciter = recSel.value;
       if (window.Store) Store.set('reciter', reciter);
+      paintDl();
     });
 
     right.appendChild(transBtn);
@@ -435,6 +747,53 @@
     header.appendChild(hAr);
     header.appendChild(hEn);
     header.appendChild(hMeta);
+
+    // ---- "Download the surah" row: at the top of the surah, above the ayahs ----
+    const dlRow = document.createElement('div');
+    dlRow.className = 's-dl-row';
+    dlRow.hidden = !window.AudioOffline;
+    const dlMain = document.createElement('button');
+    dlMain.type = 'button';
+    dlMain.className = 'btn s-dl-btn';
+    const dlLbl = document.createElement('span');
+    dlLbl.className = 's-dl-lbl';
+    dlLbl.textContent = 'Download the surah';
+    dlMain.appendChild(dlLbl);
+    const dlSide = document.createElement('div');
+    dlSide.className = 's-dl-side';
+    const dlBar = document.createElement('div');
+    dlBar.className = 's-dl-bar';
+    const dlFill = document.createElement('i');
+    dlBar.appendChild(dlFill);
+    const dlLine = document.createElement('div');
+    dlLine.className = 's-dl-line';
+    dlSide.appendChild(dlBar);
+    dlSide.appendChild(dlLine);
+    dlRow.appendChild(dlMain);
+    dlRow.appendChild(dlSide);
+    header.appendChild(dlRow);
+
+    dlMain.addEventListener('click', () => {
+      if (!s || !window.AudioOffline) return;
+      try {
+        const q = AudioOffline.queueState();
+        const busyThis = q.running && q.rec === reciter
+          && String(q.title).indexOf('Surah ' + s.number + ' ') === 0;
+        if (busyThis) {
+          if (q.paused) AudioOffline.resumeQueue(); else AudioOffline.pauseQueue();
+          paintDl();
+          return;
+        }
+        AudioOffline.enqueueSurah(s.number, reciter);
+      } catch (e) {}
+      paintDl();
+    });
+    dlRefs.btn = dlMain;
+    dlRefs.lbl = dlLbl;
+    dlRefs.fill = dlFill;
+    dlRefs.line = dlLine;
+    dlRefs.surah = s;
+    paintDl();
 
     // ---- body ----
     const body = document.createElement('div');
@@ -529,6 +888,7 @@
       }
     };
     highlightFn();
+    paintDl();
   }
 
   function mkToolbarBtn(use, title) {
@@ -601,7 +961,18 @@
     RECITERS,
     init,
     open,
-    setReciter(id) { if (id) reciter = id; },
+    setReciter(id) {
+      if (!id) return;
+      reciter = id;
+      paintDl();
+      paintWhole();
+    },
+    offline: {
+      downloadSurah(n, rec) { if (window.AudioOffline) AudioOffline.enqueueSurah(n, rec || reciter); },
+      downloadJuzAmma(rec) { if (window.AudioOffline) AudioOffline.enqueueJuzAmma(rec || reciter); },
+      downloadWholeQuran(rec) { if (window.AudioOffline) AudioOffline.enqueueWholeQuran(rec || reciter); },
+      state(s) { const r = s || curSurah; return r ? surahDlState(r) : null; },
+    },
     get surah() { return curSurah; },
     flip: {
       next() { flipPage(1); },
@@ -635,7 +1006,10 @@
         }
       },
       setAutoContinue(v) { autoContinue = !!v; },
-      isPlaying() { return !audio.paused; },
+      isPlaying() {
+        if (window.AudioNative && AudioNative.available() && AudioNative.isActive()) return AudioNative.isPlaying();
+        return !audio.paused;
+      },
       isOnce() { return playOnce; },
       currentGlobal() { return playGlobal; },
       onStateChange(cb) { if (typeof cb === 'function') stateListeners.push(cb); },

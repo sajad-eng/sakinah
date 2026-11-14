@@ -4,6 +4,7 @@ mobile/node_modules/
 
 # ── build outputs (published as GitHub Releases instead) ──
 dist/
+bundle/
 mobile/www/
 mobile/android/app/src/main/assets/public/
 site/download/*.exe
@@ -20,6 +21,8 @@ mobile/android/local.properties
 # ── local tooling / scratch (never part of the repo) ──
 android-tools/
 gh-tools/
+mobile/android/keystore.properties
+.netlify/
 
 # ── OS noise ──
 Thumbs.db

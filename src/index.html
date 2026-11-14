@@ -37,6 +37,7 @@
       <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-10.3A6.5 6.5 0 0 1 12 4a6.5 6.5 0 0 1 6.5 6.7C18.5 15.4 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.2"/></symbol>
       <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9.5a6 6 0 1 0-12 0c0 5.5-2.2 6.8-2.2 6.8h16.4S18 15 18 9.5"/><path d="M10.3 19.7a2 2 0 0 0 3.4 0"/></symbol>
       <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10.2 4.9 7.6 4.5 4.5 4.7v13.6c3.1-.2 5.7.2 7.5 1.8 1.8-1.6 4.4-2 7.5-1.8V4.7c-3.1-.2-5.7.2-7.5 1.8Z"/><path d="M12 6.5v13.6"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10.5M7.5 11 12 15.5 16.5 11M5.5 19.5h13"/></symbol>
       <symbol id="i-maximize-cyl" viewBox="0 0 24 24"><path d="M15 9V5h4v4M9 15v4H5v-4"/></symbol>
     </defs>
   </svg>
@@ -213,6 +214,19 @@
         </div>
 
         <div class="set-group">
+          <div class="set-title">Offline recitation</div>
+          <label class="select-single">Audio storage
+            <select id="set-audio-codec">
+              <option value="opus32">Opus 32 kbps — small, good quality · whole Quran ≈ 450 MB</option>
+              <option value="opus24">Opus 24 kbps — smallest · whole Quran ≈ 340 MB</option>
+              <option value="mp3">MP3 (no conversion) — largest · whole Quran ≈ 906 MB</option>
+            </select>
+          </label>
+          <div id="offline-audio-list" class="off-list"></div>
+          <div class="set-note">A download uses the internet only once — after that recitation plays with no connection at all. Everything you listen to online is saved automatically for later.</div>
+        </div>
+
+        <div class="set-group">
           <div class="set-title">Appearance</div>
           <div class="set-controls">
             <label class="radio"><input type="radio" name="theme" value="auto"> Follow Windows</label>
@@ -233,6 +247,8 @@
 <script src="js/android-bridge.js"></script>
 <script src="data/quran-ar.js"></script>
 <script src="data/quran-en.js"></script>
+<script src="js/audio-offline.js"></script>
+<script src="js/audio-native.js"></script>
 <script src="js/quran.js"></script>
 <script src="js/app.js"></script>
 </body>
